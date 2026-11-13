@@ -2166,7 +2166,7 @@ window.actualizarPlazasSorteo = async function() {
         const idDocSorteo = `sorteo_${diaSeleccionado}`;
         await setDoc(doc(db, "sorteo_erasmus", idDocSorteo), sorteoGuardado);
 
-        sorteosGuardados[pestanaSornteoActiva] = sorteoGuardado;
+        sorteosGuardados[diaSeleccionado] = sorteoGuardado;
         mostrarSorteoEnPantalla(diaSeleccionado, sorteoGuardado);
         validarBotonSorteo();
 
