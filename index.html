@@ -520,7 +520,6 @@ tr:nth-child(even){
     background: #d97706 !important;
 }
 
-/* Diseño minimalista de pestañas estilo píldora con hover en blanco */
 .pestanas-sorteo-container {
     display: inline-flex;
     background: #e2e8f0;
@@ -649,7 +648,7 @@ tr:nth-child(even){
     cursor: pointer;
     margin-top: 0;
     width: auto;
-    display: none; /* Oculto por defecto para no administradores */
+    display: none;
     align-items: center;
     gap: 4px;
     transition: background 0.2s ease;
@@ -791,7 +790,6 @@ tr:nth-child(even){
 <details class="container" id="acordeonSorteo" style="display: none;">
     <summary>Sorteo de plazas Erasmus</summary>
     
-    <!-- Pestañas minimalistas tipo "pill" para alternar entre el Sorteo del Martes y del Jueves -->
     <div>
         <div class="pestanas-sorteo-container">
             <button id="btnPestanaMartes" class="btn-pestana-sorteo" onclick="seleccionarPestanaSorteo('Martes')">Sorteo Martes</button>
@@ -799,7 +797,6 @@ tr:nth-child(even){
         </div>
     </div>
 
-    <!-- Controles de Sorteo (Estrictamente exclusivo para administradores) -->
     <div id="controlesAdminSorteo" style="display: none; margin-top: 10px;">
         <div style="margin-top: 10px; margin-bottom: 14px;">
             <label for="plazasDisponibles"><b>Plazas disponibles (para la pestaña activa):</b></label>
@@ -809,7 +806,6 @@ tr:nth-child(even){
         <button id="btnActualizarPlazas" class="btn-actualizar-plazas" style="display:none;" onclick="actualizarPlazasSorteo()">Actualizar plazas y recalcular listado del sorteo</button>
     </div>
 
-    <!-- Resultados y Avisos del Sorteo Martes -->
     <div id="resultadoSorteoMartes" class="resultadoSorteoContainer" style="display:none;">
         <div class="header-sorteo-flex">
             <h4 id="tituloSorteoMartes" style="margin: 0; color: #1e293b; font-size: 15px;"></h4>
@@ -826,7 +822,6 @@ tr:nth-child(even){
         <button id="btnRealizarSorteoMartes" onclick="ejecutarSorteoFirebase()" style="margin-top:0;">Realizar sorteo aleatorio</button>
     </div>
 
-    <!-- Resultados y Avisos del Sorteo Jueves -->
     <div id="resultadoSorteoJueves" class="resultadoSorteoContainer" style="display:none;">
         <div class="header-sorteo-flex">
             <h4 id="tituloSorteoJueves" style="margin: 0; color: #1e293b; font-size: 15px;"></h4>
@@ -885,7 +880,9 @@ function esAdministradorValido(nombreSocio) {
 
 window.addEventListener('DOMContentLoaded', () => {
     inicializarListaSocios();
-    verificarEstadoInicial();
+    if (typeof verificarEstadoInicial === 'function') {
+        verificarEstadoInicial();
+    }
     validarBotonSorteo();
     setInterval(validarBotonSorteo, 1000);
 
@@ -1002,7 +999,9 @@ function seleccionarSocioBuscador(nombreSocio) {
     document.getElementById('buscadorSocio').value = nombreSocio;
     document.getElementById('listaSugerencias').style.display = 'none';
     document.getElementById('nombre').value = nombreSocio;
-    gestionarSocio();
+    if (typeof gestionarSocio === 'function') {
+        gestionarSocio();
+    }
 }
 
 function obtenerIdUnicoDispositivo() {
@@ -1075,7 +1074,7 @@ function ocultarMensaje() {
 
 window.cambiarSocio = function(event) {
     event.preventDefault();
-    localStorage.removeItem('gmadrid_erasmus_socio');
+    localStorage.removeItem('gmadrid_socio_actual');
     document.getElementById('acordeonSolicitudes').style.display = 'none';
     document.getElementById('acordeonSorteo').style.display = 'none';
     location.reload();
@@ -1172,7 +1171,60 @@ function filtrarDia(dia) {
     if (dia === 'Martes') document.getElementById("btnFiltroMartes").classList.add("activo");
     if (dia === 'Jueves') document.getElementById("btnFiltroJueves").classList.add("activo");
 
-    renderizarTabla();
+    if (typeof renderizarTabla === 'function') {
+        renderizarTabla();
+    }
+}
+
+function comprobarCambioPlazas() {
+    const plazasInputEl = document.getElementById("plazasDisponibles");
+    if (!plazasInputEl) return;
+    const plazasInput = Number(plazasInputEl.value);
+    const btnActualizar = document.getElementById("btnActualizarPlazas");
+    const sorteoGuardado = sorteosGuardados[pestanaSorteoActiva];
+
+    if (sorteoGuardado && plazasInput > 0 && plazasInput !== sorteoGuardado.plazasDisponibles) {
+        if(btnActualizar) btnActualizar.style.display = "block";
+    } else {
+        if(btnActualizar) btnActualizar.style.display = "none";
+    }
+    validarBotonSorteo();
+}
+
+function validarBotonSorteo() {
+    const plazasInputEl = document.getElementById("plazasDisponibles");
+    if (!plazasInputEl) return;
+
+    const plazas = Number(plazasInputEl.value);
+    const btnActualizar = document.getElementById("btnActualizarPlazas");
+
+    const sorteoGuardado = sorteosGuardados[pestanaSorteoActiva];
+    const inscritosActuales = todasLasSolicitudes.filter(s => esDeEstaSemana(s.fechaRegistro) && s.diaErasmus === pestanaSorteoActiva);
+    const hayParticipantes = inscritosActuales.length > 0;
+    
+    const sorteoSinSocios = sorteoGuardado && sorteoGuardado.ordenCompleto && sorteoGuardado.ordenCompleto.filter(p => inscritosActuales.map(s => s.nombre).includes(p.nombre)).length === 0;
+    const sorteoYaHecho = sorteoGuardado !== undefined && !sorteoSinSocios;
+
+    const btnSorteoMartes = document.getElementById("btnRealizarSorteoMartes");
+    const btnSorteoJueves = document.getElementById("btnRealizarSorteoJueves");
+
+    const btnActivoSorteo = pestanaSorteoActiva === 'Martes' ? btnSorteoMartes : btnSorteoJueves;
+
+    if (sorteoYaHecho) {
+        if (btnActivoSorteo) btnActivoSorteo.disabled = true;
+        if (plazas > 0 && btnActualizar && sorteoGuardado && plazas !== sorteoGuardado.plazasDisponibles) {
+            btnActualizar.style.display = "block";
+        } else if (btnActualizar) {
+            btnActualizar.style.display = "none";
+        }
+        return;
+    }
+
+    if (btnActualizar) btnActualizar.style.display = "none";
+    if (btnActivoSorteo) {
+        btnActivoSorteo.disabled = !(plazas && plazas > 0 && hayParticipantes);
+        btnActivoSorteo.textContent = sorteoSinSocios ? "Volver a realizar sorteo" : "Realizar sorteo aleatorio";
+    }
 }
 </script>
 
@@ -1209,8 +1261,10 @@ async function generarHashPin(pin) {
 }
 
 window.verificarEstadoInicial = async function() {
-    const socioGuardado = localStorage.getItem('gmadrid_erasmus_socio');
+    const socioGuardado = localStorage.getItem('gmadrid_socio_actual');
     if (!socioGuardado) {
+        document.getElementById('bloqueSelector').style.display = 'block';
+        document.getElementById('bloqueSaludo').style.display = 'none';
         document.getElementById('acordeonSolicitudes').style.display = 'none';
         document.getElementById('acordeonSorteo').style.display = 'none';
         return;
@@ -1222,6 +1276,8 @@ window.verificarEstadoInicial = async function() {
         const snapCredencial = await getDoc(refCredencial);
         const deviceIdActual = obtenerIdUnicoDispositivo();
 
+        // Si el socio no tiene credencial previa creada en BD, o si no tiene deviceId registrado, 
+        // le permitimos autenticarse introduciendo su PIN en lugar de borrar el localStorage de golpe.
         if (snapCredencial.exists() && snapCredencial.data().deviceId === deviceIdActual) {
             document.getElementById('bloqueSelector').style.display = 'none';
             const bloqueSaludo = document.getElementById('bloqueSaludo');
@@ -1232,15 +1288,27 @@ window.verificarEstadoInicial = async function() {
             document.getElementById('buscadorSocio').value = socioGuardado;
             await prepararInterfazSocioIdentificado(socioGuardado);
         } else {
-            localStorage.removeItem('gmadrid_erasmus_socio');
-            document.getElementById('bloqueSelector').style.display = 'block';
-            document.getElementById('bloqueSaludo').style.display = 'none';
-            document.getElementById('acordeonSolicitudes').style.display = 'none';
-            document.getElementById('acordeonSorteo').style.display = 'none';
+            // Si el dispositivo no coincide o no está registrado, requerimos validación por PIN
+            document.getElementById('bloqueSelector').style.display = 'none';
+            const bloqueSaludo = document.getElementById('bloqueSaludo');
+            document.getElementById('textoSaludo').textContent = `¡Hola, ${socioGuardado}! (Verificación requerida)`;
+            bloqueSaludo.style.display = 'block';
+
+            document.getElementById('nombre').value = socioGuardado;
+            document.getElementById('buscadorSocio').value = socioGuardado;
+            
+            // Mostrar bloque de PIN para que confirme su identidad en este nuevo dispositivo
+            document.getElementById("bloquePin").style.display = "block";
+            if (snapCredencial.exists()) {
+                document.getElementById("etiquetaPinLabel").textContent = "Introduce tu PIN de 4 dígitos:";
+                document.getElementById("ayudaPinCreacion").style.display = "none";
+            } else {
+                document.getElementById("etiquetaPinLabel").textContent = "Crea tu PIN nuevo de 4 dígitos:";
+                document.getElementById("ayudaPinCreacion").style.display = "block";
+            }
         }
     } catch (error) {
         console.error("Verificación inicial omitida:", error);
-        localStorage.removeItem('gmadrid_erasmus_socio');
         document.getElementById('bloqueSelector').style.display = 'block';
         document.getElementById('bloqueSaludo').style.display = 'none';
         document.getElementById('acordeonSolicitudes').style.display = 'none';
@@ -1252,10 +1320,10 @@ window.gestionarSocio = async function() {
     ocultarMensaje();
     const nombre = document.getElementById("nombre").value;
     if (nombre) {
-        localStorage.setItem('gmadrid_erasmus_socio', nombre);
+        localStorage.setItem('gmadrid_socio_actual', nombre);
         await verificarDispositivoYCredencial(nombre);
     } else {
-        localStorage.removeItem('gmadrid_erasmus_socio');
+        localStorage.removeItem('gmadrid_socio_actual');
         document.getElementById("bloquePin").style.display = "none";
         document.getElementById("formErasmus").style.display = "none";
         document.getElementById('acordeonSolicitudes').style.display = 'none';
@@ -1317,7 +1385,7 @@ window.verificarDispositivoYCredencial = async function(nombreSocio) {
 
 window.validarOConfigurarPin = async function() {
     if (procesandoOperacion) return;
-    const socioGuardado = localStorage.getItem('gmadrid_erasmus_socio');
+    const socioGuardado = localStorage.getItem('gmadrid_socio_actual');
     const nombreSocioSelect = document.getElementById("nombre").value;
     const nombreSocio = socioGuardado || nombreSocioSelect;
     const pinInput = document.getElementById("pinSocio").value.trim();
@@ -1445,7 +1513,8 @@ window.cargarSorteosGuardados = async function() {
         });
 
         if (sorteosGuardados[pestanaSorteoActiva]) {
-            document.getElementById("plazasDisponibles").value = sorteosGuardados[pestanaSorteoActiva].plazasDisponibles;
+            const plazasEl = document.getElementById("plazasDisponibles");
+            if (plazasEl) plazasEl.value = sorteosGuardados[pestanaSorteoActiva].plazasDisponibles;
         }
 
         verificarInscripcionActual();
@@ -1461,10 +1530,11 @@ window.cargarSorteosGuardados = async function() {
 
 window.seleccionarPestanaSorteo = function(dia) {
     pestanaSorteoActiva = dia;
+    const plazasEl = document.getElementById("plazasDisponibles");
     if (sorteosGuardados[dia] && sorteosGuardados[dia].plazasDisponibles) {
-        document.getElementById("plazasDisponibles").value = sorteosGuardados[dia].plazasDisponibles;
+        if (plazasEl) plazasEl.value = sorteosGuardados[dia].plazasDisponibles;
     } else {
-        document.getElementById("plazasDisponibles").value = "";
+        if (plazasEl) plazasEl.value = "";
     }
     actualizarVistaPestanasSorteo();
     validarBotonSorteo();
@@ -1480,46 +1550,46 @@ function actualizarVistaPestanasSorteo() {
     const avisoJueves = document.getElementById("avisoSinSorteoJueves");
     const btnSorteoJuevesContenedor = document.getElementById("contenedorBtnSorteoJueves");
 
-    const socioActual = localStorage.getItem('gmadrid_erasmus_socio') || document.getElementById("nombre").value;
+    const socioActual = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
     const esAdmin = esAdministradorValido(socioActual);
 
     if (pestanaSorteoActiva === 'Martes') {
-        btnMartes.classList.add("activo");
-        btnJueves.classList.remove("activo");
-        containerJueves.style.display = "none";
-        avisoJueves.style.display = "none";
-        btnSorteoJuevesContenedor.style.display = "none";
+        if(btnMartes) btnMartes.classList.add("activo");
+        if(btnJueves) btnJueves.classList.remove("activo");
+        if(containerJueves) containerJueves.style.display = "none";
+        if(avisoJueves) avisoJueves.style.display = "none";
+        if(btnSorteoJuevesContenedor) btnSorteoJuevesContenedor.style.display = "none";
 
         if (sorteosGuardados['Martes']) {
-            containerMartes.style.display = "block";
-            avisoMartes.style.display = "none";
-            btnSorteoMartesContenedor.style.display = "none";
+            if(containerMartes) containerMartes.style.display = "block";
+            if(avisoMartes) avisoMartes.style.display = "none";
+            if(btnSorteoMartesContenedor) btnSorteoMartesContenedor.style.display = "none";
         } else {
-            containerMartes.style.display = "none";
-            avisoMartes.style.display = "block";
-            btnSorteoMartesContenedor.style.display = esAdmin ? "block" : "none";
+            if(containerMartes) containerMartes.style.display = "none";
+            if(avisoMartes) avisoMartes.style.display = "block";
+            if(btnSorteoMartesContenedor) btnSorteoMartesContenedor.style.display = esAdmin ? "block" : "none";
         }
     } else {
-        btnJueves.classList.add("activo");
-        btnMartes.classList.remove("activo");
-        containerMartes.style.display = "none";
-        avisoMartes.style.display = "none";
-        btnSorteoMartesContenedor.style.display = "none";
+        if(btnJueves) btnJueves.classList.add("activo");
+        if(btnMartes) btnMartes.classList.remove("activo");
+        if(containerMartes) containerMartes.style.display = "none";
+        if(avisoMartes) avisoMartes.style.display = "none";
+        if(btnSorteoMartesContenedor) btnSorteoMartesContenedor.style.display = "none";
 
         if (sorteosGuardados['Jueves']) {
-            containerJueves.style.display = "block";
-            avisoJueves.style.display = "none";
-            btnSorteoJuevesContenedor.style.display = "none";
+            if(containerJueves) containerJueves.style.display = "block";
+            if(avisoJueves) avisoJueves.style.display = "none";
+            if(btnSorteoJuevesContenedor) btnSorteoJuevesContenedor.style.display = "none";
         } else {
-            containerJueves.style.display = "none";
-            avisoJueves.style.display = "block";
-            btnSorteoJuevesContenedor.style.display = esAdmin ? "block" : "none";
+            if(containerJueves) containerJueves.style.display = "none";
+            if(avisoJueves) avisoJueves.style.display = "block";
+            if(btnSorteoJuevesContenedor) btnSorteoJuevesContenedor.style.display = esAdmin ? "block" : "none";
         }
     }
 }
 
 function actualizarEstadoAcordeones() {
-    const socioActual = localStorage.getItem('gmadrid_erasmus_socio') || document.getElementById("nombre").value;
+    const socioActual = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
     const esAdmin = esAdministradorValido(socioActual);
     const acordeonSolicitudes = document.getElementById("acordeonSolicitudes");
     const acordeonSorteo = document.getElementById("acordeonSorteo");
@@ -1528,11 +1598,11 @@ function actualizarEstadoAcordeones() {
     const btnCopiarJueves = document.getElementById("btnCopiarJueves");
 
     if (esAdmin) {
-        controlesAdminSorteo.style.display = "block";
+        if(controlesAdminSorteo) controlesAdminSorteo.style.display = "block";
         if(btnCopiarMartes) btnCopiarMartes.style.display = "flex";
         if(btnCopiarJueves) btnCopiarJueves.style.display = "flex";
     } else {
-        controlesAdminSorteo.style.display = "none";
+        if(controlesAdminSorteo) controlesAdminSorteo.style.display = "none";
         if(btnCopiarMartes) btnCopiarMartes.style.display = "none";
         if(btnCopiarJueves) btnCopiarJueves.style.display = "none";
     }
@@ -1545,7 +1615,7 @@ function actualizarEstadoAcordeones() {
     const sorteoRealizadoParaMiGrupo = sorteoObjGrupo !== undefined && !sorteoVacio;
 
     const solicitudesEstaSemana = todasLasSolicitudes.filter(s => esDeEstaSemana(s.fechaRegistro));
-    if (socioActual) {
+    if (socioActual && acordeonSolicitudes) {
         acordeonSolicitudes.style.display = "block";
         const estaInscrito = solicitudesEstaSemana.some(s => s.nombre === socioActual);
         
@@ -1554,7 +1624,7 @@ function actualizarEstadoAcordeones() {
         } else if (estaInscrito) {
             acordeonSolicitudes.open = true;
         }
-    } else {
+    } else if (acordeonSolicitudes) {
         acordeonSolicitudes.style.display = "none";
     }
 
@@ -1568,14 +1638,14 @@ function actualizarEstadoAcordeones() {
     const sorteoRealizado = (sorteosGuardados["Martes"] && sorteosGuardados["Martes"].ordenCompleto && sorteosGuardados["Martes"].ordenCompleto.length > 0) ||
                             (sorteosGuardados["Jueves"] && sorteosGuardados["Jueves"].ordenCompleto && sorteosGuardados["Jueves"].ordenCompleto.length > 0);
 
-    if (esAdmin || sorteoRealizado) {
+    if ((esAdmin || sorteoRealizado) && acordeonSorteo) {
         acordeonSorteo.style.display = "block";
         if (sorteoObj && socioEnSorteo) {
             acordeonSorteo.open = true;
         } else {
             acordeonSorteo.open = false;
         }
-    } else {
+    } else if (acordeonSorteo) {
         acordeonSorteo.style.display = "none";
     }
 }
@@ -1595,12 +1665,9 @@ function calcularProximaAperturaSorteo(diaErasmus) {
 }
 
 function actualizarCuentaAtrasAviso() {
-    const socio = localStorage.getItem('gmadrid_erasmus_socio') || document.getElementById("nombre").value;
+    const socio = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
     const infoCuentaAtras = document.getElementById("infoCuentaAtras");
-    if (!socio) {
-        infoCuentaAtras.style.display = "none";
-        return;
-    }
+    if (!socio || !infoCuentaAtras) return;
 
     const grupoNatural = obtenerGrupoSocio(socio);
     const diaErasmusQueAspira = grupoNatural === "Martes" ? "Jueves" : "Martes";
@@ -1632,10 +1699,12 @@ function actualizarCuentaAtrasAviso() {
 setInterval(actualizarCuentaAtrasAviso, 1000);
 
 function verificarInscripcionActual() {
-    const socio = localStorage.getItem('gmadrid_erasmus_socio') || document.getElementById("nombre").value;
+    const socio = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
     if (!socio) return;
     
     const btnAccion = document.getElementById("btnAccionErasmus");
+    if (!btnAccion) return;
+
     const grupoNatural = obtenerGrupoSocio(socio);
     const diaErasmusQueAspira = grupoNatural === "Martes" ? "Jueves" : "Martes";
     
@@ -1693,6 +1762,7 @@ function obtenerSociosSeleccionadosSemanaAnterior() {
 
 window.renderizarTabla = function() {
     const tabla = document.getElementById("tablaErasmus");
+    if (!tabla) return;
     tabla.innerHTML = "";
 
     const solicitudesFiltradas = todasLasSolicitudes.filter(s => {
@@ -1733,7 +1803,7 @@ window.renderizarTabla = function() {
 }
 
 window.ejecutarAccionErasmus = async function(){
-    const socio = localStorage.getItem('gmadrid_erasmus_socio') || document.getElementById("nombre").value;
+    const socio = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
     if(!socio){
         mostrarMensaje("Selecciona tu nombre", "advertencia");
         return;
@@ -1758,7 +1828,7 @@ window.ejecutarAccionErasmus = async function(){
 
     if(estadoSocioActual === 'bloqueado'){
         mostrarMensaje("Ya participaste esta semana", "advertencia");
-        btnAccion.disabled = true;
+        if(btnAccion) btnAccion.disabled = true;
         return;
     }
 
@@ -1774,8 +1844,10 @@ window.ejecutarAccionErasmus = async function(){
             return;
         }
 
-        btnAccion.disabled = true;
-        btnAccion.textContent = "Procesando...";
+        if(btnAccion) {
+            btnAccion.disabled = true;
+            btnAccion.textContent = "Procesando...";
+        }
 
         try {
             await deleteDoc(doc(db, "erasmus", idDoc));
@@ -1791,12 +1863,14 @@ window.ejecutarAccionErasmus = async function(){
             await cargarErasmus();
         } catch (error) {
             mostrarMensaje("Error al procesar baja", "error");
-            btnAccion.disabled = false;
+            if(btnAccion) btnAccion.disabled = false;
             verificarInscripcionActual();
         }
     } else if(estadoSocioActual === 'libre' || sorteoVacio) {
-        btnAccion.disabled = true;
-        btnAccion.textContent = "Procesando...";
+        if(btnAccion) {
+            btnAccion.disabled = true;
+            btnAccion.textContent = "Procesando...";
+        }
 
         const fechaEventoObj = obtenerProximoDiaFecha(diaErasmusQueAspira);
         const fechaEventoStr = fechaEventoObj.toLocaleDateString("es-ES");
@@ -1817,57 +1891,11 @@ window.ejecutarAccionErasmus = async function(){
             await cargarErasmus();
         } catch (error) {
             mostrarMensaje("Error de conexión BD", "error");
-            btnAccion.disabled = false;
+            if(btnAccion) btnAccion.disabled = false;
             verificarInscripcionActual();
         }
     }
 };
-
-window.comprobarCambioPlazas = function() {
-    const plazasInput = Number(document.getElementById("plazasDisponibles").value);
-    const btnActualizar = document.getElementById("btnActualizarPlazas");
-    const sorteoGuardado = sorteosGuardados[pestanaSorteoActiva];
-
-    if (sorteoGuardado && plazasInput > 0 && plazasInput !== sorteoGuardado.plazasDisponibles) {
-        btnActualizar.style.display = "block";
-    } else {
-        btnActualizar.style.display = "none";
-    }
-    validarBotonSorteo();
-}
-
-function validarBotonSorteo() {
-    const plazas = Number(document.getElementById("plazasDisponibles").value);
-    const btnActualizar = document.getElementById("btnActualizarPlazas");
-
-    const sorteoGuardado = sorteosGuardados[pestanaSorteoActiva];
-    const inscritosActuales = todasLasSolicitudes.filter(s => esDeEstaSemana(s.fechaRegistro) && s.diaErasmus === pestanaSorteoActiva);
-    const hayParticipantes = inscritosActuales.length > 0;
-    
-    const sorteoSinSocios = sorteoGuardado && sorteoGuardado.ordenCompleto && sorteoGuardado.ordenCompleto.filter(p => inscritosActuales.map(s => s.nombre).includes(p.nombre)).length === 0;
-    const sorteoYaHecho = sorteoGuardado !== undefined && !sorteoSinSocios;
-
-    const btnSorteoMartes = document.getElementById("btnRealizarSorteoMartes");
-    const btnSorteoJueves = document.getElementById("btnRealizarSorteoJueves");
-
-    const btnActivoSorteo = pestanaSorteoActiva === 'Martes' ? btnSorteoMartes : btnSorteoJueves;
-
-    if (sorteoYaHecho) {
-        if (btnActivoSorteo) btnActivoSorteo.disabled = true;
-        if (plazas > 0 && plazas !== sorteoGuardado.plazasDisponibles) {
-            btnActualizar.style.display = "block";
-        } else {
-            btnActualizar.style.display = "none";
-        }
-        return;
-    }
-
-    btnActualizar.style.display = "none";
-    if (btnActivoSorteo) {
-        btnActivoSorteo.disabled = !(plazas && plazas > 0 && hayParticipantes);
-        btnActivoSorteo.textContent = sorteoSinSocios ? "Volver a realizar sorteo" : "Realizar sorteo aleatorio";
-    }
-}
 
 function mezclarArrayAleatorio(array) {
     const copia = [...array];
@@ -1912,13 +1940,13 @@ function mostrarSorteoEnPantalla(dia, datosSorteo) {
     const infoFecha = document.getElementById(dia === "Martes" ? "infoFechaSorteoMartes" : "infoFechaSorteoJueves");
     const listaHTML = document.getElementById(dia === "Martes" ? "listaGanadoresMartes" : "listaGanadoresJueves");
 
-    if (!datosSorteo || !datosSorteo.ordenCompleto) {
+    if (!datosSorteo || !datosSorteo.ordenCompleto || !contenedor) {
         if (pestanaSorteoActiva === dia) {
             contenedor.style.display = "none";
-            aviso.style.display = "block";
-            const socioActual = localStorage.getItem('gmadrid_erasmus_socio') || document.getElementById("nombre").value;
+            if(aviso) aviso.style.display = "block";
+            const socioActual = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
             const esAdmin = esAdministradorValido(socioActual);
-            btnSorteoContenedor.style.display = esAdmin ? "block" : "none";
+            if(btnSorteoContenedor) btnSorteoContenedor.style.display = esAdmin ? "block" : "none";
         }
         return;
     }
@@ -1931,27 +1959,27 @@ function mostrarSorteoEnPantalla(dia, datosSorteo) {
     const fechaExactaStr = formatearFechaLarga(obtenerProximoDiaFecha(dia));
 
     if (ordenActualizado.length === 0) {
-        tituloSorteo.textContent = `🏆 Sorteo activo (${fechaExactaStr})`;
-        infoFecha.textContent = `Ejecutado: ${datosSorteo.fechaRealizacion} a las ${datosSorteo.horaRealizacion || ''} por ${datosSorteo.realizadoPor || 'Admin'}`;
-        listaHTML.innerHTML = `<li style="justify-content: center; background: #e0f2fe; color: #0369a1; border-color: #bae6fd; font-weight: bold;">ℹ️ Sin inscritos activos</li>`;
+        if(tituloSorteo) tituloSorteo.textContent = `🏆 Sorteo activo (${fechaExactaStr})`;
+        if(infoFecha) infoFecha.textContent = `Ejecutado: ${datosSorteo.fechaRealizacion} a las ${datosSorteo.horaRealizacion || ''} por ${datosSorteo.realizadoPor || 'Admin'}`;
+        if(listaHTML) listaHTML.innerHTML = `<li style="justify-content: center; background: #e0f2fe; color: #0369a1; border-color: #bae6fd; font-weight: bold;">ℹ️ Sin inscritos activos</li>`;
         if (pestanaSorteoActiva === dia) {
             contenedor.style.display = "block";
-            aviso.style.display = "none";
-            btnSorteoContenedor.style.display = "none";
+            if(aviso) aviso.style.display = "none";
+            if(btnSorteoContenedor) btnSorteoContenedor.style.display = "none";
         }
         return;
     }
 
     const plazasDisponibles = datosSorteo.plazasDisponibles || 0;
-    tituloSorteo.textContent = `🏆 Sorteo activo (${fechaExactaStr})`;
+    if(tituloSorteo) tituloSorteo.textContent = `🏆 Sorteo activo (${fechaExactaStr})`;
     
     let textoInfoEjecucion = `Ejecutado: ${datosSorteo.fechaRealizacion} a las ${datosSorteo.horaRealizacion || ''} por ${datosSorteo.realizadoPor || 'Admin'} - Plazas: ${plazasDisponibles}`;
     if (datosSorteo.fechaActualizacionPlazas) {
         textoInfoEjecucion += ` (Plazas actualizadas el ${datosSorteo.fechaActualizacionPlazas} a las ${datosSorteo.horaActualizacionPlazas || ''})`;
     }
-    infoFecha.textContent = textoInfoEjecucion;
+    if(infoFecha) infoFecha.textContent = textoInfoEjecucion;
 
-    listaHTML.innerHTML = "";
+    if(listaHTML) listaHTML.innerHTML = "";
 
     ordenActualizado.forEach((persona, index) => {
         const esPrincipal = index < plazasDisponibles;
@@ -1966,18 +1994,20 @@ function mostrarSorteoEnPantalla(dia, datosSorteo) {
             ? `<span class="badge-prioridad-baja">Repetidor</span>`
             : `<span class="badge-prioridad-alta">Prioritario</span>`;
 
-        listaHTML.innerHTML += `
-            <li class="${claseFondo}">
-                <span><b>${index + 1}. ${nombreLimpioPersona}</b></span>
-                <div class="badges-container">
-                    ${badgePrioridadHTML}
-                    ${badgePlazaHTML}
-                </div>
-            </li>
-        `;
+        if(listaHTML) {
+            listaHTML.innerHTML += `
+                <li class="${claseFondo}">
+                    <span><b>${index + 1}. ${nombreLimpioPersona}</b></span>
+                    <div class="badges-container">
+                        ${badgePrioridadHTML}
+                        ${badgePlazaHTML}
+                    </div>
+                </li>
+            `;
+        }
     });
 
-    if (plazasDisponibles > ordenActualizado.length) {
+    if (plazasDisponibles > ordenActualizado.length && listaHTML) {
         for (let i = ordenActualizado.length; i < plazasDisponibles; i++) {
             listaHTML.innerHTML += `
                 <li class="item-libre">
@@ -1991,19 +2021,20 @@ function mostrarSorteoEnPantalla(dia, datosSorteo) {
         }
     }
 
-    if (pestanaSorteoActiva === dia) {
+    if (pestanaSorteoActiva === dia && contenedor) {
         contenedor.style.display = "block";
-        aviso.style.display = "none";
-        btnSorteoContenedor.style.display = "none";
+        if(aviso) aviso.style.display = "none";
+        if(btnSorteoContenedor) btnSorteoContenedor.style.display = "none";
     }
 
-    if (dia === pestanaSorteoActiva && !document.getElementById("plazasDisponibles").value) {
-        document.getElementById("plazasDisponibles").value = plazasDisponibles;
+    const plazasInputEl = document.getElementById("plazasDisponibles");
+    if (dia === pestanaSorteoActiva && plazasInputEl && !plazasInputEl.value) {
+        plazasInputEl.value = plazasDisponibles;
     }
 }
 
 window.copiarResultadosWhatsApp = function(dia) {
-    const socioActual = localStorage.getItem('gmadrid_erasmus_socio') || document.getElementById("nombre").value;
+    const socioActual = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
     
     if (!esAdministradorValido(socioActual)) {
         mostrarMensaje("Acción no permitida. No tienes permisos de administrador.", "error");
@@ -2059,7 +2090,7 @@ window.copiarResultadosWhatsApp = function(dia) {
 };
 
 window.ejecutarSorteoFirebase = async function() {
-    const socioActual = localStorage.getItem('gmadrid_erasmus_socio') || document.getElementById("nombre").value;
+    const socioActual = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
     
     if (!esAdministradorValido(socioActual)) {
         mostrarMensaje("Acción no permitida. No tienes permisos de administrador.", "error");
@@ -2067,7 +2098,8 @@ window.ejecutarSorteoFirebase = async function() {
     }
 
     const diaSeleccionado = pestanaSorteoActiva;
-    const plazas = Number(document.getElementById("plazasDisponibles").value);
+    const plazasInputEl = document.getElementById("plazasDisponibles");
+    const plazas = Number(plazasInputEl ? plazasInputEl.value : 0);
 
     if (!plazas || plazas <= 0) {
         mostrarMensaje("Indica un número válido de plazas disponibles", "advertencia");
@@ -2107,7 +2139,7 @@ window.ejecutarSorteoFirebase = async function() {
 };
 
 window.actualizarPlazasSorteo = async function() {
-    const socioActual = localStorage.getItem('gmadrid_erasmus_socio') || document.getElementById("nombre").value;
+    const socioActual = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
     
     if (!esAdministradorValido(socioActual)) {
         mostrarMensaje("Acción no permitida. No tienes permisos de administrador.", "error");
@@ -2115,7 +2147,8 @@ window.actualizarPlazasSorteo = async function() {
     }
 
     const diaSeleccionado = pestanaSorteoActiva;
-    const nuevasPlazas = Number(document.getElementById("plazasDisponibles").value);
+    const plazasInputEl = document.getElementById("plazasDisponibles");
+    const nuevasPlazas = Number(plazasInputEl ? plazasInputEl.value : 0);
 
     if (!nuevasPlazas || nuevasPlazas <= 0) {
         mostrarMensaje("Indica plazas válidas", "advertencia");
@@ -2133,7 +2166,7 @@ window.actualizarPlazasSorteo = async function() {
         const idDocSorteo = `sorteo_${diaSeleccionado}`;
         await setDoc(doc(db, "sorteo_erasmus", idDocSorteo), sorteoGuardado);
 
-        sorteosGuardados[pestanaSorteoActiva] = sorteoGuardado;
+        sorteosGuardados[pestanaSornteoActiva] = sorteoGuardado;
         mostrarSorteoEnPantalla(diaSeleccionado, sorteoGuardado);
         validarBotonSorteo();
 
