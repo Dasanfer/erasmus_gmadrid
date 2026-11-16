@@ -87,6 +87,12 @@ html, body {
     100% { background-position: 0% 50%; }
 }
 
+@keyframes bgArcoirisBtn {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
 body::before {
     content: '';
     position: fixed;
@@ -503,12 +509,6 @@ details.container {
     color: #475569;
 }
 
-@keyframes bgArcoirisBtn {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-}
-
 button{
     width: 100%;
     margin-top: 16px;
@@ -525,7 +525,6 @@ button{
     touch-action: manipulation;
     transition: transform 0.15s ease, filter 0.2s ease;
 }
-
 
 button:active:not(:disabled) {
     transform: scale(0.97);
@@ -1151,9 +1150,25 @@ window.addEventListener('DOMContentLoaded', () => {
     actualizarRelojCabecera();
     setInterval(actualizarRelojCabecera, 1000);
     inicializarListaSocios();
-    if (typeof verificarEstadoInicial === 'function') {
-        verificarEstadoInicial();
-    }
+    
+    // Verificación inicial con soporte global sincronizado
+    verificarEstadoInicialUnificado();
+
+    // Sincronización automática global de sesión entre Fichaje, Juegos, Asistencia y Erasmus
+    window.addEventListener('storage', (event) => {
+        if (event.key === 'gmadrid_socio_global' || event.key === 'gmadrid_socio_actual') {
+            const socioGlobal = event.newValue;
+            if (socioGlobal) {
+                localStorage.setItem('gmadrid_socio_actual', socioGlobal);
+                localStorage.setItem('gmadrid_socio_global', socioGlobal);
+            } else {
+                localStorage.removeItem('gmadrid_socio_actual');
+                localStorage.removeItem('gmadrid_socio_global');
+            }
+            verificarEstadoInicialUnificado();
+        }
+    });
+
     validarBotonSorteo();
     setInterval(validarBotonSorteo, 1000);
 
@@ -1203,6 +1218,19 @@ window.addEventListener('DOMContentLoaded', () => {
         setTimeout(spawnGameItem, i * 400);
     }
 });
+
+function verificarEstadoInicialUnificado() {
+    let socio = localStorage.getItem('gmadrid_socio_actual');
+    if (!socio) {
+        socio = localStorage.getItem('gmadrid_socio_global');
+        if (socio) {
+            localStorage.setItem('gmadrid_socio_actual', socio);
+        }
+    }
+    if (typeof verificarEstadoInicial === 'function') {
+        verificarEstadoInicial();
+    }
+}
 
 function actualizarRelojCabecera() {
     const ahora = new Date();
@@ -1384,6 +1412,7 @@ function ocultarMensaje() {
 window.cambiarSocio = function(event) {
     event.preventDefault();
     localStorage.removeItem('gmadrid_socio_actual');
+    localStorage.removeItem('gmadrid_socio_global');
     document.getElementById('acordeonSolicitudes').style.display = 'none';
     document.getElementById('acordeonSorteo').style.display = 'none';
     location.reload();
@@ -1615,7 +1644,15 @@ async function generarHashPin(pin) {
 }
 
 window.verificarEstadoInicial = async function() {
-    const socioGuardado = localStorage.getItem('gmadrid_socio_actual');
+    // Sincronización unificada de claves
+    let socioGuardado = localStorage.getItem('gmadrid_socio_actual');
+    if (!socioGuardado) {
+        socioGuardado = localStorage.getItem('gmadrid_socio_global');
+        if (socioGuardado) {
+            localStorage.setItem('gmadrid_socio_actual', socioGuardado);
+        }
+    }
+
     if (!socioGuardado) {
         document.getElementById('bloqueSelector').style.display = 'block';
         document.getElementById('bloqueSaludo').style.display = 'none';
@@ -1674,10 +1711,13 @@ window.gestionarSocio = async function() {
     ocultarMensaje();
     const nombre = document.getElementById("nombre").value;
     if (nombre) {
+        // Guardar tanto en local como en global para propagar a Fichaje, Juegos y Asistencia
         localStorage.setItem('gmadrid_socio_actual', nombre);
+        localStorage.setItem('gmadrid_socio_global', nombre);
         await verificarDispositivoYCredencial(nombre);
     } else {
         localStorage.removeItem('gmadrid_socio_actual');
+        localStorage.removeItem('gmadrid_socio_global');
         document.getElementById("bloquePin").style.display = "none";
         document.getElementById("formErasmus").style.display = "none";
         document.getElementById('acordeonSolicitudes').style.display = 'none';
@@ -1741,7 +1781,7 @@ window.verificarDispositivoYCredencial = async function(nombreSocio) {
 
 window.validarOConfigurarPin = async function() {
     if (procesandoOperacion) return;
-    const socioGuardado = localStorage.getItem('gmadrid_socio_actual');
+    let socioGuardado = localStorage.getItem('gmadrid_socio_actual') || localStorage.getItem('gmadrid_socio_global');
     const nombreSocioSelect = document.getElementById("nombre").value;
     const nombreSocio = socioGuardado || nombreSocioSelect;
     const pinInput = document.getElementById("pinSocio").value.trim();
@@ -1922,7 +1962,7 @@ function actualizarVistaPestanasSorteo() {
     const avisoJueves = document.getElementById("avisoSinSorteoJueves");
     const btnSorteoJuevesContenedor = document.getElementById("contenedorBtnSorteoJueves");
 
-    const socioActual = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
+    const socioActual = localStorage.getItem('gmadrid_socio_actual') || localStorage.getItem('gmadrid_socio_global') || document.getElementById("nombre").value;
     const esAdminGrupo = esAdminDelGrupo(socioActual, pestanaSorteoActiva);
 
     if (pestanaSorteoActiva === 'Martes') {
@@ -1961,7 +2001,7 @@ function actualizarVistaPestanasSorteo() {
 }
 
 function actualizarEstadoAcordeones() {
-    const socioActual = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
+    const socioActual = localStorage.getItem('gmadrid_socio_actual') || localStorage.getItem('gmadrid_socio_global') || document.getElementById("nombre").value;
     const esAdmin = esAdministradorValido(socioActual);
     const esAdminPestanaActual = esAdminDelGrupo(socioActual, pestanaSorteoActiva);
     
@@ -2052,7 +2092,7 @@ function calcularProximaAperturaSorteo(diaErasmus) {
 }
 
 function actualizarCuentaAtrasAviso() {
-    const socio = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
+    const socio = localStorage.getItem('gmadrid_socio_actual') || localStorage.getItem('gmadrid_socio_global') || document.getElementById("nombre").value;
     const infoCuentaAtras = document.getElementById("infoCuentaAtras");
     if (!socio || !infoCuentaAtras) return;
 
@@ -2100,7 +2140,7 @@ function actualizarCuentaAtrasAviso() {
 setInterval(actualizarCuentaAtrasAviso, 1000);
 
 function verificarInscripcionActual() {
-    const socio = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
+    const socio = localStorage.getItem('gmadrid_socio_actual') || localStorage.getItem('gmadrid_socio_global') || document.getElementById("nombre").value;
     if (!socio) return;
     
     const btnAccion = document.getElementById("btnAccionErasmus");
@@ -2220,7 +2260,7 @@ window.renderizarTabla = function() {
 }
 
 window.ejecutarAccionErasmus = async function(){
-    const socio = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
+    const socio = localStorage.getItem('gmadrid_socio_actual') || localStorage.getItem('gmadrid_socio_global') || document.getElementById("nombre").value;
     if(!socio){
         mostrarMensaje("Selecciona tu nombre", "advertencia");
         return;
@@ -2396,7 +2436,7 @@ function mostrarSorteoEnPantalla(dia, datosSorteo) {
                 }
             }
 
-            const socioActual = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
+            const socioActual = localStorage.getItem('gmadrid_socio_actual') || localStorage.getItem('gmadrid_socio_global') || document.getElementById("nombre").value;
             const esAdminGrupo = esAdminDelGrupo(socioActual, dia);
             if(btnSorteoContenedor) {
                 btnSorteoContenedor.style.display = (esAdminGrupo && habilitadoPorHora) ? "block" : "none";
@@ -2476,7 +2516,7 @@ function mostrarSorteoEnPantalla(dia, datosSorteo) {
 }
 
 window.copiarResultadosWhatsApp = function(dia) {
-    const socioActual = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
+    const socioActual = localStorage.getItem('gmadrid_socio_actual') || localStorage.getItem('gmadrid_socio_global') || document.getElementById("nombre").value;
     if (!esAdministradorValido(socioActual)) {
         mostrarMensaje("Acción no permitida. No tienes permisos de administrador.", "error");
         return;
@@ -2529,7 +2569,7 @@ window.copiarResultadosWhatsApp = function(dia) {
 };
 
 window.ejecutarSorteoFirebase = async function() {
-    const socioActual = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
+    const socioActual = localStorage.getItem('gmadrid_socio_actual') || localStorage.getItem('gmadrid_socio_global') || document.getElementById("nombre").value;
     const diaSeleccionado = pestanaSorteoActiva;
     
     if (!esAdminDelGrupo(socioActual, diaSeleccionado)) {
@@ -2585,7 +2625,7 @@ window.ejecutarSorteoFirebase = async function() {
 };
 
 window.actualizarPlazasSorteo = async function() {
-    const socioActual = localStorage.getItem('gmadrid_socio_actual') || document.getElementById("nombre").value;
+    const socioActual = localStorage.getItem('gmadrid_socio_actual') || localStorage.getItem('gmadrid_socio_global') || document.getElementById("nombre").value;
     const diaSeleccionado = pestanaSorteoActiva;
 
     if (!esAdminDelGrupo(socioActual, diaSeleccionado)) {
