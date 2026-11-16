@@ -538,6 +538,11 @@ button:disabled {
     box-shadow: none;
 }
 
+@keyframes barridoDesdeArriba {
+    0% { opacity: 0; transform: translate(-50%, -40px); }
+    100% { opacity: 1; transform: translate(-50%, 0); }
+}
+
 #mensaje {
     position: fixed;
     top: 20px;
@@ -557,6 +562,7 @@ button:disabled {
     box-sizing: border-box;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
+    animation: barridoDesdeArriba 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
 .mensaje-contenido {
@@ -1398,6 +1404,9 @@ function mostrarMensaje(texto, tipo = 'exito') {
     }
 
     mensaje.style.color = colorTexto;
+    mensaje.style.animation = 'none';
+    mensaje.offsetHeight;
+    mensaje.style.animation = '';
     mensaje.style.display = "block";
     btnCerrar.style.color = colorTexto;
 
